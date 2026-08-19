@@ -2,7 +2,7 @@ schema_version: 1
 
 context:
   name: libcrcpp
-  version: 1.2.1.0
+  version: "1.2.2.0"
 
 package:
   name: ${{ name|lower }}
@@ -10,7 +10,7 @@ package:
 
 source:
   url: https://github.com/d-bahr/CRCpp/archive/refs/tags/release-${{ version }}.tar.gz
-  sha256: e2019ed95300f865fe0c1ea326e5502e1ba538bfbc2e31d175a5ee313b31510d
+  sha256: 8a069757ced03644cef1afe44ff821ce1087f12f6443e9a5059d6b8272114e58
 
 build:
   noarch: generic
