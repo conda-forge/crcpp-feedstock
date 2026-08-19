@@ -45,6 +45,7 @@ tests:
         files:
           source:
             - CMakeLists.txt
+            - cmake/
             - inc/
             - test/
           recipe:
@@ -66,6 +67,7 @@ tests:
         files:
           source:
             - CMakeLists.txt
+            - cmake/
             - inc/
             - test/
           recipe:
