@@ -13,8 +13,7 @@ source:
   sha256: 8a069757ced03644cef1afe44ff821ce1087f12f6443e9a5059d6b8272114e58
 
 build:
-  noarch: generic
-  number: 0
+  number: 1
   script:
     - if: unix
       then:
@@ -22,25 +21,45 @@ build:
         - cmake --install build
     - if: win
       then:
-        - cmake -G Ninja -S . -B build %CMAKE_ARGS% -DCMAKE_INSTALL_PREFIX="%PREFIX%" -DCMAKE_INSTALL_INCLUDE_DIR=include -DBUILD_TEST=OFF
+        - cmake -G Ninja -S . -B build %CMAKE_ARGS% -DCMAKE_INSTALL_PREFIX="%LIBRARY_PREFIX%" -DCMAKE_INSTALL_INCLUDE_DIR=include -DBUILD_TEST=OFF
         - cmake --install build
 
 requirements:
   build:
     - ${{ compiler('cxx') }}
     - ${{ stdlib('c') }}
-  host:
     - cmake
     - ninja
+  # Header-only: the package ships no compiled artifacts, so it needs no
+  # C/C++ runtime at run time. (noarch: generic used to suppress these.)
+  ignore_run_exports:
+    by_name:
+      - libgcc
+      - libstdcxx
 
 tests:
-  - if: unix
+  # Layout check. Runs everywhere, including cross-compiled targets, and is
+  # what guards the %PREFIX% vs %PREFIX%\Library regression this recipe fixes.
+  - package_contents:
+      include:
+        - CRC.h
+      files:
+        exists:
+          - ${{ "Library/" if win }}share/cmake/crcpp/CRCppConfig.cmake
+          - ${{ "Library/" if win }}share/pkgconfig/CRCpp.pc
+
+  # The remaining tests compile and run a binary, so they only work when the
+  # target is executable on the builder. macOS cannot run arm64 binaries on an
+  # x86_64 runner (EBADARCH), so cross-compiled targets are skipped.
+  - if: unix and target_platform == build_platform
     then:
       - script:
           - cmake -G Ninja -S . -B build ${CMAKE_ARGS} -DCMAKE_INSTALL_INCLUDE_DIR=include -DBUILD_TEST=ON
           - cmake --build build
           - ctest --test-dir build --output-on-failure
-          - ${CXX} -std=c++11 -I"${PREFIX}/include" test.cpp -o crcpp-test
+          # $LDFLAGS carries -Wl,-rpath,$PREFIX/lib; without it the binary
+          # cannot locate libstdc++.so.6 when run under emulation.
+          - ${CXX} ${CXXFLAGS} ${LDFLAGS} -std=c++11 -I"${PREFIX}/include" test.cpp -o crcpp-test
           - ./crcpp-test
         files:
           source:
@@ -56,13 +75,22 @@ tests:
             - ${{ stdlib('c') }}
             - cmake
             - ninja
-  - if: win
+          # The test binary links a C++ runtime even though the package
+          # itself ships none. On cross-compiled targets (aarch64, ppc64le)
+          # the test runs under emulation, so the runtime must be present in
+          # the test's run env -- the build env holds the wrong architecture.
+          run:
+            - if: linux
+              then: libstdcxx
+            - if: osx
+              then: libcxx
+  - if: win and target_platform == build_platform
     then:
       - script:
           - cmake -G Ninja -S . -B build %CMAKE_ARGS% -DCMAKE_INSTALL_INCLUDE_DIR=include -DBUILD_TEST=ON
           - cmake --build build
           - ctest --test-dir build --output-on-failure
-          - '%CXX% /std:c++14 /I"%PREFIX%\include" test.cpp /Fe:crcpp-test.exe'
+          - '%CXX% /std:c++14 /I"%LIBRARY_PREFIX%\include" test.cpp /Fe:crcpp-test.exe'
           - crcpp-test.exe
         files:
           source:
