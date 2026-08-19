@@ -38,7 +38,20 @@ requirements:
       - libstdcxx
 
 tests:
-  - if: unix
+  # Layout check. Runs everywhere, including cross-compiled targets, and is
+  # what guards the %PREFIX% vs %PREFIX%\Library regression this recipe fixes.
+  - package_contents:
+      include:
+        - CRC.h
+      files:
+        exists:
+          - ${{ "Library/" if win }}share/cmake/crcpp/CRCppConfig.cmake
+          - ${{ "Library/" if win }}share/pkgconfig/CRCpp.pc
+
+  # The remaining tests compile and run a binary, so they only work when the
+  # target is executable on the builder. macOS cannot run arm64 binaries on an
+  # x86_64 runner (EBADARCH), so cross-compiled targets are skipped.
+  - if: unix and target_platform == build_platform
     then:
       - script:
           - cmake -G Ninja -S . -B build ${CMAKE_ARGS} -DCMAKE_INSTALL_INCLUDE_DIR=include -DBUILD_TEST=ON
@@ -71,7 +84,7 @@ tests:
               then: libstdcxx
             - if: osx
               then: libcxx
-  - if: win
+  - if: win and target_platform == build_platform
     then:
       - script:
           - cmake -G Ninja -S . -B build %CMAKE_ARGS% -DCMAKE_INSTALL_INCLUDE_DIR=include -DBUILD_TEST=ON
