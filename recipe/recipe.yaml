@@ -60,6 +60,15 @@ tests:
             - ${{ stdlib('c') }}
             - cmake
             - ninja
+          # The test binary links a C++ runtime even though the package
+          # itself ships none. On cross-compiled targets (aarch64, ppc64le)
+          # the test runs under emulation, so the runtime must be present in
+          # the test's run env -- the build env holds the wrong architecture.
+          run:
+            - if: linux
+              then: libstdcxx
+            - if: osx
+              then: libcxx
   - if: win
     then:
       - script:
